@@ -4,7 +4,7 @@ Notes I have made on different programming languages or tools:
 
 <p>
 <ul>
-    <a href="https://github.com/sergijoan22/notes/blob/main/notes/python.pdf"><li><b>Python</b> <img src="https://github.com/sergijoan22/sergijoan22/blob/main/pictures/python.png?raw=true" alt="python" style="zoom:1.5%;"></li></a>
+    <a href="https://github.com/sergijoan22/notes/blob/main/notes/python.pdf"><li><b>Python</b> <img src="https://github.com/sergijoan22/sergijoan22/blob/main/pictures/python.png?raw=true" alt="python"  width="4%"></li></a>
         <ul>
         <a href="https://github.com/sergijoan22/notes/blob/main/notes/python_data_structures.md"><li><b>Data Structures</b></li></a>
             <a href="https://github.com/sergijoan22/notes/blob/main/notes/python_oop.md"><li><b>Object Oriented Programing</b></li></a> 
