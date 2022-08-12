@@ -1,17 +1,20 @@
-## Spark
-
-- Spark does not stores data, it just computes it from a source to a destination.
-
-- There is a driver that distributes data to be computed by the executors, who actually perform the work.
-- More executors does not always mean faster processing, an equilibrium must be found.
-
-- Using distributed computing is called parallelism.
-- Depending of the percentage of a task that can be parallelized, the number of processors that can be used to improve performance varies (Amdahl's law).
-- Spark has linear scalability, so it can take advantage of thousands of resources.
-
-- Spark can be used for scaling data amount or for better speeds.
+# Spark
 
 More info: [The Internals of Apache Spark](https://books.japila.pl/apache-spark-internals/)
+
+## Architecture
+
+- Spark does not stores data (mounts it, which is point to where it is stored), it is a computing engine for data processing.
+
+- There is a driver that distributes data to be computed by the executors, who actually perform the work. Each of these are in one machine. Using several machines for processing is called parallelism.
+- Each machine forming the cluster can have multiple cores and these multiple threads. The minimal unit of each, which can be a core or a thread, is called a slot.
+- Unit of parallelism is calculated considering the slots of the executor machines.
+- Not all executors or slots are always used since not always means faster performance. There is always a communication cost between the machines and slots to consider. There must be a balance between computation and communication, and the catalyst (An internal optimizer) helps with that.
+- When the data is parallelized, the divisions are called partitions. The optimal number to divide the dataset depends on the size, the original partition in the dataset origin (ex. data comes from a lot of small files) and the cluster configuration.
+- Depending of the percentage of a task that can be parallelized, the number of processors that can be used to improve performance varies (Amdahl's law).
+- Spark has linear scalability, so it can take advantage of thousands of resources. Using more resources assures better speeds and scaling the data amount.
+
+- Spark local mode: Driver and executor in the same physical machine. Not the most suitable for production (specially for heavy loads) but works for prototyping.
 
 ## Spark DataFrame
 
@@ -32,91 +35,49 @@ It should always be used the API of the DataFrame, and in case of using SQL, it 
 
 When using RDD API, Scala if faster than Python, but using the DataFrame API the performance is similar between these and the other languages.
 
-Using the DataFrame API, you specify what you want to do, not how. The catalyst, an internal optimizer will decide the best way to achieve the task. The catalyst can change your code to be more efficient. This is a difference with the RDD API, which is imperative, while the DataFrame's is declarative.
+Using the DataFrame API, you specify what you want to do, not how. The catalyst will decide the best way to achieve the task. The catalyst can change your code to be more efficient. This is a difference with the RDD API, which is imperative, while the DataFrame's is declarative.
 
 The catalyst generates several plans which gives the same result than the user input. Then, depending of the cost of each plan, the most optimal is chosen.
 
-## Databricks trial
+## Caching
 
-Databricks is a unified platform with several tools including deployed instances of Spark with some benefits and optimizations.
+- To avoid workers to be loading there data partition every time it is used, data can be cached in their memory,
 
-It allows also to do other tasks reporting or machine learning in the same environment.
+- Significant increase in queries performance.
+- Going to the Spark UI -> Storage it indicates the tables that are being caches, indicating for each in how many partitions or the memory size. They appear under the RDD tab (Since a DataFrame is in the core a RDD).
+- Memory of data gets smaller saved in cache compared to disk thanks to built-in optimizations called Tungsten.
+- It can also be done lazy caching, so data is not immediately cached but when needed. If after defining a lazy caching of table, a query uses part of the table, only partitions of the table containing the rows used will be cached. Per example, if only used the first 100 rows in a query, only the partition(s) containing those 100 rows are cached, while the rest of the table isn't.
+- When a job is done, using the View option and then the DAG visualization, if the stage has a green dot means that the data accessed was cached. It will also be indicated in the dot's tooltip.
+- To remove everything cached, a command can be used or restarting the cluster also works.
 
-Databricks Community Edition is a free version to try Databricks. When logging and having to choose a cloud provider, select "Get started with Community Edition" at the bottom.
+## Shuffle partitions
 
-Create a cluster using the highest runtime version with both ML and LTS. The cluster has a timeout but for that case it has a Restart button.
+- First, there are two types of transformations. Narrow transformations (Such as a SELECT, DROP or WHERE) are those for which the executors don't need to access to data from the other partitions. However, in wide transformations (Such as a DISTINCT, GROUP BY or ORDER BY) the executors need to access to the rest of the data in the other nodes in the cluster.
 
-A notebook, in which it is chosen the language and cluster used, can be created to interact with a cluster using the language. In case of using SQL, so we can start writing code.
+- After performing a query, it is shown jobs that have been done and the stages of each job as well (The stages and jobs numbers vary depending and are incrementally increasing through the session).
+- For a narrow transformation like a simple COUNT from a table, two stages are needed since first the COUNT is done within each node  partition and then the results are aggregated. Second stage can't start until all nodes finish the first stage (So a faster single node won't make any difference but a single slow one will cause bottleneck. Also, when all nodes have performed the task to be all put together is called a stage boundary) and is performed by any of the nodes chosen by chance. In the second step, since nodes can't directly read memory from other nodes, each one has created in the first step a shuffle write which is this case is a single row containing the COUNT performed in the partition. Then, the node that performs the second task does a shuffle read to get the results from the previous stage of all the partitions.
+- These process of two steps is done this way since Spark is a  bulk synchronous processing system. All this process can be seen using the Spark UI.
+- Now, in case of a wide transformation being performed (COUNT but using a GROUP BY): The first stage has one task per node (The number of tasks can also be a multiple of the number of nodes as well) like the simple COUNT. In this stage, each node has made a shuffle write containing the GROUP BY of each partition. The next stage would be to aggregate these results. In this stage, and for a wide transformation, the number of tasks is by default 200. This value may not be optimal, and in the Spark UI can be seen that most tasks maybe haven't done any work. However, this number of task performed is not automatic but rigged by a parameter.
+- That parameter is the Shuffle partitions parameter and its default value is 200. It controls how many tasks are done in stage when there is shuffle (A shuffle read after shuffle writes have been done in the previous stage) caused by a wide transformation. In the example of the GROUP BY, in the first stage the nodes create shuffle writes and it is in the second stage where this happens. For the case of being 200 the parameter value, there are too many tasks to read just a few rows that the shuffle writes have generated, so only a few tasks do a shuffle read, while the others don't.
+- The parameter can be changed when creating the cluster or it can be changed within a notebook dynamically. Using a improper value for a query may lead to poor performance. The value should be proportional to the amount of data.
 
-```SQL
-SHOW TABLES
-```
+## Adaptive Query Execution
 
-No results given since no table has ben defined yet.
+- Automatically updates query plans based on runtime statistics. The catalyst optimizer, which is used by default and changes the query plans as well, does not know how to perform when the queries include user defined functions. So, AQE allows the catalyst optimizer to use a different way to perform queries, which happens in the middle of a query using runtime statistics. It is between stages when the the query is reoptimized.
+- The AQE can dynamically:
+	- Coalesce shuffle partitions: There is not an universal optimal shuffle partition number, since data changes at different times of query execution. AQE puts first a high value of partitions, but automatically coalesce them to have at the end a n optimal number of partitions which will have a similar shuffle read load. So, no need to manually put a shuffle partition value.
+	- Switch join strategies: When doing a join, data is randomly located in nodes. AQE does a broadcast join, which, in case of being one of the datasets significantly smaller than the other, puts a copy of the dataset in all the nodes. This way, each node can do internally the join and then simply append all the shuffle writes, having to shuffle less data.
+	- Optimize skew joins: There is a data skew if data load is unevenly distributed through the partitions, and it can have a negative performance impact since a node with a significantly heavier load will be a bottleneck. AQE, after the data being initially partitioned, it is going to provide skew hints (Indicating the dissimilar loads) and then with a skew reader, read the data in an evenly distribution.
 
-Even though we have defined the language as SQL, we can use other language.
+- When seeing the jobs used in a query that has used AQE, it will as skipped the staged that have been substituted, and the substitution stage after.
 
-```python
-%python
-x = 10
-print(x)
-```
+More info: [How to Speed up SQL Queries with Adaptive Query Execution (databricks.com)](https://www.databricks.com/blog/2020/05/29/adaptive-query-execution-speeding-up-spark-sql-at-runtime.html)
 
-## Databricks Practice
+## Databricks
 
-In workspace -> Home there is the home folder.  Using an URL (https://files.training.databricks.com/courses/ucdavis/Lessons.dbc), it is imported a collection of notebooks for practice.
+- Databricks is a unified platform with several tools including deployed instances of Spark with some benefits and optimizations.
 
-### 1.4-SQL-Notebook
+- It allows also to do other tasks reporting or machine learning in the same environment.
+- It is available in Azure, AWS and GCP.
 
-To access data, we run a script to that mounts (points to the data origin, does not upload it) a dataset, specifically an S3 bucket in AWS. It is mounted in the path /mnt/davis
-
-```
-%run ../Includes/Classroom-Setup
-```
-
-We can see a preview of a file. It can be see that the file has a header
-
-```
-%fs head /mnt/davis/fire-calls/fire-calls-truncated-comma.csv
-```
-
-Now a database is created to be used and then a table inside the database to store the file content.
-
-```sql
-CREATE DATABASE IF NOT EXISTS Databricks
-```
-
-```sql
-USE Databricks
-```
-
-```sql
-DROP TABLE IF EXISTS fireCalls;
-
-CREATE TABLE IF NOT EXISTS fireCalls
-USING csv
-OPTIONS (
-  header "true", -- file has a header
-  path "/mnt/davis/fire-calls/fire-calls-truncated-comma.csv",
-  inferSchema "true" -- to find data type of each column
-)
-```
-
-Now, in the left-hand menu , in the Data tab we can find the database and the table. Also, in the Recents tab we can directly go to what we recently accessed.
-
-We can apply queries to the table. Under the output, there is an option to show insted a table as the result a graph of different kinds.
-
-```sql
-SELECT `Neighborhooods - Analysis Boundaries` as neighborhood, 
-  COUNT(`Neighborhooods - Analysis Boundaries`) as count 
-FROM FireCalls 
-GROUP BY `Neighborhooods - Analysis Boundaries`
-ORDER BY count DESC
-```
-
-### 1.5-Import-Data
-
-First, download a csv file (https://s3-us-west-2.amazonaws.com/davis-dsv1071/data/fire-calls/fire-calls-truncated-comma-no-spaces.csv). Now on the Dat tab, we can create a table and then use the previous file. It can be selected the 'Create Table with UI' option and it must be chosen the cluster. Then, with an UI it can be configured the table attributes. Then, we can use the new table.
-
-In this case, dat is not mounted, but actually stored in Databricks.
-
+- Databricks Community Edition is a free version to try Databricks.
