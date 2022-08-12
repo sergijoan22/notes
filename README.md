@@ -13,7 +13,7 @@ Notes I have made on different programming languages or tools:
          <a style="font-size:18px;" href="https://github.com/sergijoan22/notes/blob/main/notes/python_regex.md"><li><b>Regular Expressions</b></li></a> 
         </ul>
     <a style="font-size:20px;" href="https://github.com/sergijoan22/notes/blob/main/notes/t_sql.md"><li><b>SQL</b> </li></a>
-    <a style="font-size:20px;"  href="https://github.com/sergijoan22/notes/blob/main/notes/spark_databricks.md"><li><b>Spark and Databricks</b> </li></a>    
+    <a style="font-size:20px;"  href="https://github.com/sergijoan22/notes/blob/main/notes/spark.md"><li><b>Spark</b> </li></a>    
     <a style="font-size:20px;"  href="https://github.com/sergijoan22/notes/blob/main/notes/mongodb.md"><li><b>MongoDB</b> </li></a>
         <a style="font-size:20px;" href="https://github.com/sergijoan22/notes/blob/main/notes/git.md"><li><b>GIT</b> </li></a>
     <a style="font-size:20px;" href="https://github.com/sergijoan22/notes/blob/main/notes/docker.md"><li><b>Docker</b> </li></a>
