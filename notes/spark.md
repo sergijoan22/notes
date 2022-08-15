@@ -1,5 +1,7 @@
 # Spark
 
+These notes have been done using Spark in Databricks and mainly SQL but also Python.
+
 More info: [The Internals of Apache Spark](https://books.japila.pl/apache-spark-internals/)
 
 ## Architecture
@@ -72,6 +74,37 @@ The catalyst generates several plans which gives the same result than the user i
 - When seeing the jobs used in a query that has used AQE, it will as skipped the staged that have been substituted, and the substitution stage after.
 
 More info: [How to Speed up SQL Queries with Adaptive Query Execution (databricks.com)](https://www.databricks.com/blog/2020/05/29/adaptive-query-execution-speeding-up-spark-sql-at-runtime.html)
+
+## Data Pipelines
+
+- Process of moving data through applications in a automated way. Must be scalable to process a bigger data volume, velocity and variety.
+- Input data usually comes from a Kafka-like technology, which is a messaging system. It puts data in a queue if needed to avoid overloading the pipeline.
+- A design principle is to decouple storage and compute. No data is stored on the cluster, so this can be disactivated when it is not being used, allowing to save resoruces.
+- There are two bottlenecks: First, there are IO-bound problems, since a big amount of data requires a heavy network transfer. It is important to decide the best way to store and access the data. Spark optimizes the clusters locations to use faster networks. Additionally, there are CPU-bound problems, since some operations on data can be very complex and demanding.
+- Pipelines prepare data for both OLAP and OLTP workloads.
+
+### Data input
+
+- Data lakes like Amazon S3 or Azure Blob Storage can be mounted into Spark to access data within them. These both services have support for the Databricks File System or DBFS.
+
+- It is recommended to use JDBC if possible since Spark is written in Scala (A language which runs on the Java Virtual Machine). It stands for Java Database Connectivity, an API to connect to databases. Spark allows to use with JDBC an optimization called Predicate push down, which allows to perform certain operations in the database before retrieving the data, like filtering it so the network transfer is lighter.
+- There are serial reads (Only one database connection to read data) and parallel connection (Parallelize data reading using several database connections).
+
+### File formats
+
+- The ideal file format for distributed systems is delta, column-based and based on Apache Parquet. Delta has some additions such as database-like ACID operations.
+- Using a column-bases file format like Delta and Parquet gives several benefits like better compression or being able to be read in parallel. Those both have metadata so is not needed infer the schema when reading the table, saving a lot of time.
+
+### Data output
+
+- When writing data from Spark, it is done in parallel, since data is stored in different partitions. If writing in a file, it would be actually written one file per partition.
+
+## Tables and views
+
+- When creating a table, it is not actually stored in a database but in the Databricks File System and its metadata in the Hive Metastore.
+- A global view or table is available through all clusters while a temporary view is available only in the current notebook.
+- A managed table is a table that manages both the data and the metadata. If it the removed, both components are removed. However, unmanaged tables only manage the metadata, while the data is in a different location, so dropping the table does not delete the data.
+- Unmanaged (Or external) tables allow to persist data even after shutting down the cluster. When created, a location is defined where data is persisted.
 
 ## Databricks
 
