@@ -2,6 +2,8 @@
 
 These notes have been done using Spark in Databricks and mainly SQL but also Python.
 
+Databricks practice is in the [misc repository](https://github.com/sergijoan22/misc/tree/main/databricks_exercises)
+
 More info: [The Internals of Apache Spark](https://books.japila.pl/apache-spark-internals/)
 
 ## Architecture
@@ -114,3 +116,19 @@ More info: [How to Speed up SQL Queries with Adaptive Query Execution (databrick
 - It is available in Azure, AWS and GCP.
 
 - Databricks Community Edition is a free version to try Databricks.
+
+## Lakehouses
+
+- Combines the scalability and low-cost storage of data lakes and the speed, ACID transactions (Atomicity, Consistency, Isolation, Durability) and reliability of data warehouses. No need to be copying data from lake to warehouse, a single solution is enough.
+- Delta Lake is an open-source project highly compatible with Spark. Allows to do database-like operations in a data lake. Built on top of Parquet, saves also a transaction log tracking an historical of all changes, allowing to roll back to previous versions.
+- They work with any kind of data and are suitable for different applications like BI or ML.
+
+- Address some of the data lakes problems: Hard to append or modify data in files, job failing mid way can cause corrupt files, real-time operations are complex, costly to keep historical data versions, difficult to handle large metadata files, worse performance when data distributed in a lot of small files, hard to track who accesses to data and hard to ensure data is following am expected defined schema.
+
+- To solve some of the problems, Delta Lake offers ACID transactions, Indexing, table ACLs (Access Control Lists) for data governance and schema enforcement.
+
+- Incoming data goes to a bronze table, where it is put raw, as it comes from the source. A schema enforcement can be made to quarantine data not meeting the expectations and avoid propagating it to later stages.
+
+- Then, data passes to a silver table, with filtered, cleaned or augmented data. Then, gold tables have the data aggregated to a business-level, since not less granularity can be enough. The use of bronze, silver and gold tables in order is a medallion architecture. All three kinds of tables are Delta tables, backed by S3 or an equivalent service.
+
+- In Delta lake, schema validation is on write, so new writes to a table are checked for compatibility. If there is an exception, the write is not executed. A table schema can be dynamically updated.
