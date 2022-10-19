@@ -27,6 +27,8 @@ WHERE _TABLE_SUFFIX = '0802' # to filter tables
 
 Legacy SQL
 
+--------------------------------------------------------------------------------------------
+
 ## Introduction
 
 ### Data engineer
@@ -364,7 +366,7 @@ There are input and output process for different outside connections, like BigQu
 
 Then, there are several intermediate processed like:
 
-- ParDo to filter, cast or compute data.
+- ParDo to filter, cast compute, or extract parts of data.
 - GroupByKey to shuffle key-values pairs and group them.
 - CoGroupByKey to join two or more key-value pairs.
 - Combine to aggregate values with different options like doing it with all the values or all within each key. The aggregation method can be personalized creating a subclass. Using Combine is more effective than GroupByKey since no need for data shuffling when scanning through the data partitions.
@@ -641,7 +643,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Publishers or subscribers don't need to be online all the time
 
-Stores messages for 7 days by default
+Stores messages for 7 days by default. Can be set to a minimum of 10 minutes and maximum of 7 days.
 
 Messages encrypted in transit and in rest
 
@@ -1230,6 +1232,32 @@ The error logs are automatically analyzed by Error Reporting service for a centr
 >
 > ![](https://cloud.google.com/static/logging/docs/images/routing-overview-17-09-21.png)
 
+## Data migration
+
+### Storage Transfer Service
+
+Used to move data between place, once or periodically (As part of a pipeline or workflow):
+
+- To GCS from a local or other cloud provider origin.
+- Between GCS buckets.
+- From GCS to a local or cloud file system.
+- Between file systems.
+
+### HDFS to GCS
+
+Use of Hadoop DistCp to copy data from HDFS to Cloud Storage. Two methods:
+
+- Push model, where files are directly uploaded from the source cluster to GCS.
+- Pull model, where ephemeral Dataproc clusters pull the files from the source clusters and copies them to GCS. More complex but recommended if the source cluster will be used while migrating. Also, no need to install the Cloud Storage connector on the source.
+
+### Transfer Appliance Service
+
+Offline process for large amounts of data. Offline process. Google Cloud ships an appliance where data is upload to a GCS bucket, then it is sent to a Google Cloud facility where it is uploaded.
+
+The appliance is about the size of a suitcase, resistant and sealed and comes in two capacities, 40 TB and 300 TB. A rack format is also available.
+
+Useful for data collection, replication and migration.
+
 ## Best practices
 
 ### Use hot pats and cold paths
@@ -1630,6 +1658,8 @@ Delta changes: Changes in data done between a particular moment and the current 
 Network firewall: Security system to prevent access to private networks connected to the Internet, like a Google Cloud service. The only traffic allowed is defined with firewall policies.
 
 YARN: In a Hadoop ecosystem, a resource manager to distribute loads between parts.
+
+Reinforcement learning: Technique where a machine tries actions without previous training training to reach the highest rewards. Wrong actions are punished and correct are rewarded so it learns with trial and error. Examples are training an agent to play a maze game or a racing game.
 
 Hash values?
 
