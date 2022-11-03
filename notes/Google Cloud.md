@@ -1198,7 +1198,33 @@ Usually used with the Cloud Data Loss Prevention API to classify sensible data.
 
 Foundation for data governance.
 
+## <img src="https://www.jhanley.com/wp-content/uploads/2019/01/Cloud-IAM.png" style="zoom:17%;" /> IAM
 
+Access control for cloud resources.
+
+###  Characteristics
+
+- Granular access within services
+- Recommender can detect and alert about unwanted permissions to resources
+- Full audit trail history of permissions given and removed
+- Dynamic access based on contextual attributes like IP, data or security status
+- No charge
+- Support for standard accounts
+
+### Parts
+
+- Principal: Who access a cloud resource. An email address to identity it. It can be:
+	- Google Account (Of end users)
+	- Service account (For applications and compute workloads). Associated with a public/private RSA key pair. Two types:
+		- Google-managed Service Account or Service agent. Created automatically by Google (If Pub/Sub writes to BG, a service agent with BG roles are given to Pub/Sub, per example). Not recommended to change their roles
+		- User-managed service account. Explicitly created or when specific services are created like Computer Engine or App Engine
+	- Google group (Collection of Google accounts and service accounts)
+	- Google workspace account
+	- Cloud Identity domain (Using third party identity providers)
+	- All users or all authenticated users
+	- Being GC structured as Organization, Folders, Projects and Services, IAM can be configured at all levels
+- Role: Collection of permissions (Specified in the form service.resource.verb and usually correspond to one API method), which allow to do specific actions. There are basic, predefined (For specific functions like Pub/Sub subscriber) and custom roles.
+- Allow Policy: Collections of bindings between principals and roles.
 
 ## Cloud Data Loss Prevention
 
@@ -1208,7 +1234,7 @@ The API detect PII when an input is passed. Findings are classified in different
 
 An of how the API works can be found [here](https://github.com/GoogleCloudPlatform/training-data-analyst/blob/master/courses/data-engineering/demos/cloud_dlp.md).
 
-Use of the API to redact .
+Use of the API to redact.
 
 ## <img src="https://miro.medium.com/max/440/1*gN2yiS3EtraUpVD_E41Ebw.png" style="zoom:9%;" /> Cloud Logging
 
