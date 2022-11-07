@@ -6,10 +6,6 @@ Cloud SDK
 
 SSH access
 
-Service account (Used to use services on a python file)
-
-Service account
-
 API Key
 
 By default, when you load data, BigQuery expects UTF-8 encoded data
@@ -296,7 +292,7 @@ Encryption:
 - It can be created immutable logs of data access.
 - A hold can be applied to an object or a bucket, and operations that change or delete the object are suspended until the hold is released.
 
-## Dataflow
+## <img src="https://codelabs.developers.google.com/static/codelabs/cloud-dataflow-starter/img/62b0919755804bea.png" style="zoom:13%;"/> Dataflow
 
 Serverless data processing service for both batch and streaming data. It creates an efficient execution mechanism to run Apache Beam.
 
@@ -310,6 +306,7 @@ Serverless data processing service for both batch and streaming data. It creates
 - Rebalances load between workers to optimize performance.
 - Great integration with other Google Cloud services.
 - Existing templates and ability to create new.
+- Optimizations with Pub/Sub if using the Dataflow runner: Improved watermark latency and accuracy, efficient deduplication of messages and automatic acknowledge of messages.
 - Dataflow Shuffle Service: In batch pipelines, moves shuffle operations from the worker VMs to the Dataflow service backend. This allows for better execution times VM consumption, autoscaling and fault tolerance.
 - Dataflow Streaming Engine: In streaming pipelines, moves the window stage storage from the VM persistent disks to the service backend. This allows for better VM consumption, response to data variations and supportability.
 - Flexible Resource Scheduling:  Reduces the cost of batch pipelines using both preemptible and normal VM through advanced scheduling techniques. Job will be done within 6 hours after creation. For not time-critical workloads. Just after submitting the job, it is scanned to check failures and report immediately.
@@ -322,7 +319,7 @@ A PCollection can be batch or streaming data, without size limit. The data is di
 
 ### Apache Beam
 
-Core of the service, Dataflow is one of the runners Beam has. It offers a portability framework to define a pipeline in a chosen language and run it in a chosen runner. A pipeline can even be multi language. Inside the code, a transform of another language SDK can be called.
+Core of the service, Dataflow is one of the runners Beam has. It offers a portability framework to define a pipeline in a chosen language and run it in a chosen runner. A pipeline can even be multi language (Create custom code in a different language than the one running the job). Inside the code, a transform of another language SDK can be called.
 
 The runtime environment can be containerized with Docker.
 
@@ -360,6 +357,17 @@ Then, there is the triggers, which determine when to emit aggregated results in 
 
 Each trigger in a window fires a pane, and there can be many panes within a window. Data affected by a trigger become a pane, and the aggregation is done at pane level. A pane can be defined between two modes: Accumulate mode to use also the data from previous panes in the window or discard mode to only use the data from that pane.
 
+### Dataflow prime
+
+Dataflow Prime version with upgraded capacities:
+
+- Vertical autoscaling of the workers memory
+- Right fitting: Different workers pools created with different capacities, the most appropriate being used in each transformation. Only needed pools have workers with GPU. Combined with horizontal and vertical autoscaling within each pole, best performance and adjusted cost.
+
+New pricing model. In regular Dataflow, independent charges for resources use like CPU, memory or data processed. Now, all compute resources are grouped in DCU (Data Compute Units), and the charge is based on the amount of DCU used. One DCU is equivalent to a job running one hour with 1 vCPU and 4 GB. Other resources, like snapshots, GPUs or persistent disk are still charges the same way, individually.
+
+Same code used than in regular Dataflow and compatible with Streaming Engine and Dataflow Shuffle.
+
 ### Set up
 
 There are input and output process for different outside connections, like BigQuery or Cloud Storage. 
@@ -391,6 +399,8 @@ Three credentials are needed to determine if a job can be launched:
 
 - Dataflow service account to interact between the project and Dataflow. Automatically created with the needed permissions when enabling the API.
 - Controller or worker service account, assigned to the VMs running the pipeline. Automatically created with the needed permissions when enabling the API. For production, recommended to create a new account with the only the roles and permissions needed. When launching a Dataflow pipeline, the account to be used can be passed, which must have at least the Dataflow worker role.
+
+An streaming Dataflow pipeline can be updated while running or it can be set when started to be auto-updated.
 
 ### Quotas
 
@@ -747,19 +757,20 @@ Pub/Sub offers **integrations** with other GCP products:
 1. Create the topic
 2. Publish to topic 
 
-## Cloud Bigtable
+## <img src="https://www.iri.com/blog/wp-content/uploads/2021/11/google-bigtable-logo.png" style="zoom:3%;" /> Cloud Bigtable
 
 noSQL key-value database for high performance applications.
 
 ### Characteristics
 
-- Best used for big data loads, at least 300 GB, with very fast access needed.
-
+- Best used for big data loads, at least 300 GB, with very fast access needed. Up to billions of rows and thousands of columns
 - Offers high-throughput of inserts, more than millions per second.
-
-- Latency on the order of miliseconds.
-
+- Latency on the order of milliseconds.
 - Great for time-series data
+- Integration with the Apache ecosystem
+- Increase of cluster size for a specific time of larger loads
+- Optimal for storing time-series, graph or iot data
+- Tables are grouped in instances, with a maximum of 1000 tables each
 
 ### Use
 
@@ -773,42 +784,143 @@ To retrieve data:
 2. Resulting rows are sorted through the row key. Speed depends of the number row and the orderliness of the original data.
 3. Not, it must be searched through the data columns to find the actual rows wanted.
 
-The row key should be created using the fields that will be most used in future queries.
-
-Using a timestamp in the row key, latest records will appear at the bottom of the table. However, a reverse timestamp (Maximum value of the long integer in the programming language used minus timestamp) can be used to put the most recent records at the top of the table. With the RTS, only getting the first n rows can give the n most recent records, without having to search the whole table.
-
 Deleting and updating:
 
 - When deleting a data, it is not done immediately, but it is marked for deletion, skipping it on next processings.
 - When updating a row, the new version is appended to the end of the table and the old marked for deletion.
-- Periodically, Bigtable compacts the table removing marked rows and reordering the new records.
+- Periodically, Bigtable compacts the table removing marked rows and reordering the new records. This is called the garbage collection.
 
-Optimizations:
+### Optimization
 
 - Allow Bigtable to learn about your patterns for automatic optimizations, using at least 300 GB and using it over a long enough period of time.
-- Design a proper table schema to evenly distribute writes and reads through the cluster.
-- Add nodes if necessary (Not reflected instantly).
+- Design a proper table schema to evenly distribute writes and reads through the cluster:
+- Add nodes if necessary to see a linear performance increase.
+- When adding or removing nodes, performance will decrease temporarily.
+- Making requests to a table that has had a period of no usage has slower performance until the connection is warm again. To avoid this, some artificial traffic can be sent when there is no real use.
 - Use SSD instead of HHD.
+- Optimize latency keeping a cluster CPU load under 70% and under 50% if possible. Also, recommended below 60% of storage utilization per node.
 - Use smaller rows for higher throughput and general better performance.
-- Rows are sorted lexicographically with the row key. Take into account to distribute writes.
-- Try to have Bigtable and the clients in the same zone.
-- Group related data for more efficient reads.
-- Use column families.
-- Use row keys to organize similar data.
-- Put identical records in the same row or in adjacent rows.
-- Replication allows to copy the data across different regions or zones within a region. Use it to increase availability and durability.
-- With replication, use one cluster for reading only and other for writing. In case of failover, traffic automatically goes the other.
+- Rows should not be more than 100 MB and a cell not more than 10 MB.
+- Use a single table instead of several smaller with similar data
+- Rows are sorted lexicographically with the row key. Take into account to distribute writes. With this, 3 > 20. However, putting a 0 first makes 20 > 03.
+- Write the timestamp in reverse to keep the most recent data at the start of the table instead of the end.
+- Bigtable does automatic data compression. It can not be configured but some keys makes it more efficient:
+	- Patterned data instead of random data
+	- Put identical values near, in the same or adjoining rows
+	- Compress values larger than MiB before entering in Bigtable
 
-Key Visualizer is a tool to analyze Bigtable usage patterns with visual reports.
+
+- Try to have Bigtable and the clients in the same zone.
+
+- Group related data for more efficient reads.
+
+- To avoid slower performance, reading a lot of not-contiguous rows in a single read should be avoided if possible.
+
+- Use column families for related.
+
+- Create no more than a hundred column families.
+
+- Choose short column names if possible.
+
+- Use row keys to organize similar data.
+
+- Put identical records in the same row or in adjacent rows.
+
+- Replication allows to copy the data across different regions or zones within a region. Use it to increase availability and durability.
+
+- With replication, a good practice is to use one cluster for reading only and other for writing. In case of failover, traffic automatically goes the other.
+
+- Using replication increase read throughput. However, write throughput does not improve and can even worsen since new data must be replicated to all the other clusters.
+
+- Replication is eventually consistent and faster the closer the zones are.
+
+- Use Key Visualizer, a tool to analyze Bigtable usage patterns with visual reports. It shows different usage metrics per row key (Grouping them by delimiters) and over time has a heatmap.
+
+- When doing a data update, it should be though for a single row needed to be updated.
+
+- A table can have millions of columns but a single row should not have more than a hundred with values. Tables are sparse, so empty values in columns don't affect storage or performance.
+
+- Columns should be treated as data. So, to store a table of relationships, the most normal way would be to create a row per relationship. Instead, it is better creating one row per person and then creating a columns for each friend. This method makes the table not to grow really long. However, many columns are created in the table, but it is not a table, since the problem is how many columns a single row has (About a hundred). Since data is sparse, columns having no value for a row won't affect storage or performance. The only limit is the case that is expected for people to have a lot of friends (And a lot of columns for that row then).
+
+  | Jose  | Fred:book-club | Gabriel:work    | Hiroshi:tennis   |
+  | ----- | -------------- | --------------- | ---------------- |
+  | Sofia | Hiroshi:work   | Seo Yoon:school | Jakob:chess-club |
+
+- If not sure about the most frequent future queries will be, one option is to store all the data for a row in one column, in a single protobuf (Serialized structured data, like a JSON, but smaller and faster), instead of several columns. Some advantages like storage saving or more flexibility, but messages always have to be deserialize and some natives features are disables.
+- In case that several types of queries will be frequent, it may be better to store the same data in more in more than a single table, with different schemas. Each table should be optimized to carry out specific queries. 
+
+### Row key design
+
+- A row key should not follow a predictable order so it can be distributed across nodes
+- Consider which are the most concurrent queries.
+- Putting multiple identifiers can be useful, usually separating them with a delimiter.
+- Usually, the prefix of the row key should be more common values and then more granular.
+- Using a timestamp in the row key, latest records will appear at the bottom of the table. However, a reverse timestamp (Maximum value of the long integer in the programming language used minus timestamp) can be used to put the most recent records at the top of the table. With the RTS, only getting the first n rows can give the n most recent records, without having to search the whole table.
+- Timestamp should not be at the start of the row key, since it would create a hotspot in a node. Put before a high-cardinality value like user ID.
+- It should not be used a sequential numeric ID, mainly because new IDs tend to be more active, funneling requests in a few nodes. An alternative is reversing is reversing the ID, since the least significant bit is random so active users are distributed across the nodes.
+- The shorter the row key the better, so using abbreviations for each identifier is recommended for better performance.
+- Row key should make data to be grouped
+- Row key should not identify a value that is frequently updated. For example, if reading some metrics from some devices every second, if having a row key like `<device_id>#<metric>`, each row would be updating continuously. This overloads the tablet storing the row. Also, since updating a row adds the new value and the old one is not instantly removed, the row could exceed its limit size. For this case, the recommended way is storing each new read in a new row, with a row key like `<device_id>#<metric>#<timestamp>`. Better approach since creating a new row isn't slower than creating a cell (A new cell with the new value inside the existing row). However, the best practice for this case will always be keeping data in memory in the application and write new rows periodically.
+- It should not contain hashed values, since the Bigtable natural sorting order ability is lost. Also, key visualizer is not intuitive. Human-readable values should be used. Same applies for values expressed as raw byes, which should also be omitted.
+- For a multi-tenancy use case (Similar data with the same data model for multiple clients stored in the same table), row key prefixes are used. It is actually the best way, instead of several smaller tables. Also, avoided the risk of passing the limit of 1000 tables per instance.
+- Using PII (Personally identifiable info) should be avoided, also in column family names. This is because these are metadata, and it can be more exposed than actual data in actions like logging or encryption.
+- Using domain names, save the reverse domain name is a good idea: `com.company.google`.
+
+### Table design for time-series data
+
+Storing this can be done in two main ways:
+
+- Time buckets, where one row represents a specific period of time, like a full hour or day. If data inside will be more than 100 MB, make smaller buckets. If 100 measurements are being read, faster to retrieve them within a single row than from 100 rows. Also, data is better compressed. However, this schema pattern has a higher development effort.
+
+	Two types of time buckets:
+
+	- Adding new event data in a new column (Knowing the limit of 100 columns), while in the cell itself the timestamp is stored.
+
+		| Row key                                             | <value_1>     | <value_2>     | <value_3>     |
+		| :-------------------------------------------------- | :------------ | :------------ | :------------ |
+		| <region_id>#<sensor_id>#<measure_id>#<period_range> | <timestamp_1> | <timestamp_2> | <timestamp_3> |
+
+		Not ideal if need for measuring changes in the time series data. Also, storage saving by using column qualifiers as data.
+
+	- Writing new event data in a new cell, storing different timestamped values in several cells within a row.
+
+		| Row key                                | pressure                        | temp                           |
+		| :------------------------------------- | :------------------------------ | :----------------------------- |
+		| <region_id>#<sensor_id>#<period_range> | <value_press_1> (<timestamp_1>) | <value_temp_1> (<timestamp_1>) |
+		|                                        | <value_press_2> (<timestamp_2>) | <value_temp_2> (<timestamp_2>) |
+		|                                        | <value_press_3> (<timestamp_3>) | <value_temp_3> (<timestamp_3>) |
+
+		Best fit for measuring changes in values over time.
+
+- Single-timestamp rows, where each new event is stored in a new row. The timestamp value is stored in the row key suffix (Not prefix, in order to avoid hotspots).
+
+	Two types of single-timestamp rows patterns:
+
+	- Single-timestamp serialized, where all row data is stored in a single column using a serialized format like a protobuf (Protocol buffer)
+
+		| Row key                               | measurements_blob |
+		| :------------------------------------ | :---------------- |
+		| <region_id>#<sensor_id>#<timestamp_1> | <protobuf_1>      |
+		| <region_id>#<sensor_id>#<timestamp_2> | <protobuf_2>      |
+		| <region_id>#<sensor_id>#<timestamp_3> | <protobuf_3>      |
+
+		The storage efficiency and speed are advantages. However, inability to retrieve only certain columns of a row and need for deserializing.
+
+	- Single-timestamp unserialized, where each data value is stored in its own column.
+
+		| Row key                               | pressure        | temperature    |
+		| :------------------------------------ | :-------------- | :------------- |
+		| <region_id>#<sensor_id>#<timestamp_1> | <value_press_1> | <value_temp_1> |
+		| <region_id>#<sensor_id>#<timestamp_2> | <value_press_2> | <value_temp_2> |
+		| <region_id>#<sensor_id>#<timestamp_3> | <value_press_3> | <value_temp_3> |
 
 ### Architecture
 
 - Data stored in the Google file system called Colossus.
-
+- When using replication, data is stored in other Colossus location
 - Colossus contains data structures called tablets used to identify and manage the data.
-
 - Metadata about the tablets is what is actually stored on the Bigtable cluster (In the VMs).
-
+- Writes are stored in Colossus's shared log
 - With that scheme, three levels of operations:
 	- Manipulate actual data.
 	- Manipulate the tablets, which point the data.
@@ -816,7 +928,26 @@ Key Visualizer is a tool to analyze Bigtable usage patterns with visual reports.
 - Rebalancing tablets is very fast since only pointers are updated.
 - Automatic optimization, detecting tablets with a lot of use to divide it in two or moving tablet pointers between the cluster VMs.
 - If a node is lost, fast replacement since only metadata must be copied to the new VM.
-- Reads and writes are equally distributed through the nodes.
+
+<img src="https://cloud.google.com/bigtable/img/bigtable-architecture.svg" style="zoom:65%;" />
+
+### Table structure
+
+- Columns grouped in column families
+- One row key-column can have several cells, each with a unique timestamp
+- If a column is not used in a row, it does not take space
+
+<img src="https://cloud.google.com/bigtable/img/storage-model.svg" style="zoom:80%;" />
+
+### Security
+
+- Access control with IAM at project, instance or table levels
+
+- Use of customer-managed encrypted keys if wanted
+
+- Creation of backups of a table's schema and data
+
+- It can be defined which cluster the requests will use: A specific one or the nearest one within a group or total
 
 ## <img src="https://www.zdnet.com/a/img/2017/11/14/a0641c5a-1404-4ed6-a564-43931e35cb2f/spanner-logo.png" style="zoom:15%;" /> Cloud Spanner
 
@@ -1687,6 +1818,4 @@ YARN: In a Hadoop ecosystem, a resource manager to distribute loads between part
 
 Reinforcement learning: Technique where a machine tries actions without previous training training to reach the highest rewards. Wrong actions are punished and correct are rewarded so it learns with trial and error. Examples are training an agent to play a maze game or a racing game.
 
-Hash values?
-
-Google Cloud Datalab?
+Multi tenancy: Mode of operation where multiple independent instances operate in a shared environment.
