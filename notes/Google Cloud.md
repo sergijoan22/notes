@@ -440,8 +440,6 @@ Ways to improve security:
 
 ## <img src="https://miro.medium.com/max/397/1*A2GhICVux__ox2jcfGXfrg.png" style="zoom:10%;"/> BigQuery
 
-((((((()))))))
-
 Query cache does not work if:
 
 - Query has non-deterministic behaviour (e.g. CURRENT_TIMESTAMP or RAND)
@@ -771,6 +769,7 @@ noSQL key-value database for high performance applications.
 - Increase of cluster size for a specific time of larger loads
 - Optimal for storing time-series, graph or iot data
 - Tables are grouped in instances, with a maximum of 1000 tables each
+- Tables in development can be upgraded to production
 
 ### Use
 
@@ -951,9 +950,123 @@ Storing this can be done in two main ways:
 
 ## <img src="https://www.zdnet.com/a/img/2017/11/14/a0641c5a-1404-4ed6-a564-43931e35cb2f/spanner-logo.png" style="zoom:15%;" /> Cloud Spanner
 
-Relational database available globally. It can take updates from different geographical regions.
+Relational database available globally.
 
-It offers bigger storage capacity than Cloud SQL.
+### Features
+
+- Fully managed deployment, replication or maintenance.
+- Data reads and writes up-to-date globally.
+- Multi-region instance option.
+- Use of schemas, SQL, ACID transactions.
+- Backups stored up to a year (Export to keep them longer).
+- Point-in-time recovery function to see the state of the database in any moment of the last 7 days.
+- 99.999% availability for multi-regional instances and 99.99% for regional ones.
+- Up to about 10000 read queries or 2000 write queries per node if the instance is in good condition. A bit less for multi-region instances.
+- No need for maintenance windows.
+- Use of IAM (At database level), Cloud Logging, Monitoring and Cloud KMS.
+- Integration with BigQuery and Vertex AI.
+- Key Visualizer and Query Insights to analyze performance.
+- Automatic data sharding (Varying key ranges for each partition) for performance increase.
+- Can be accessed through the PostgreSQL ecosystem to use many of its features with PGAdapter.
+- Costs for storage, compute, backups and potential costs for network egress. 20% or 40% saving committing to a certain use for at least one or three years.
+- 3 months free trial with up to 10 GB.
+
+### Deployment
+
+- Instance creation, where is defined:
+  - Regional or multi-region (Can be later moved if some conditions are met):
+  	- If the clients are within a region, the regional option is better.
+  	- A multi-region offers lower read latency but higher write latency.
+  	- For multi-region, these can be within one or more continents.
+  - Compute capacity (Resources available to the databases) as a number of nodes or processing units (1 node = 1000 processing units) in batches of 100 pu.
+    - At least 1 node recommended. Each node is assigned a task, and having multiple increases performance and allows for database splits.
+    - Limits storage capacities:
+    	- 1 node or more: 4 TB per node
+    	- Less than a node: 409.6 GB per 100 pu.
+    - Resources can be later increased and if possible, decreased.
+
+- Creation of a database, which contains tables, views and indexes within schemas. It is chosen
+  - Dialect: Either PostgreSQL or Google Standard SQL.
+  - Permissions with IAM and encryption.
+  - Default leader region.
+  - Other configurations like retention policy or query optimizer.
+
+- Creation of tables:
+
+  - Defining the data type of each column.
+
+  - Defining the primary key. It can be one more columns or a specified value. Using a monotonically increasing is not recommended, since data is distributed in shards by the PK range, so all new created data would be written in the same shard, creating a hotspot. So, techniques to avoid this:
+
+  	- Hash the key and use it alone or combined with the key.
+  	- Put the key after other column.
+  	- Use a Universally Unique Identifier (Version 4 recommended) instead. However, locality of related rows is lost.
+  	- Bit-reverse the key.
+
+  	For timestamp-based keys, the key column should use a descending order to have closer the most recent data.
+
+  - Add secondary indexes (Besides the primary that is the primary key). Useful if queries accessing the PK in reverse order are frequent.
+
+- Creation of views:
+	- Read only.
+	- The view query can't have query parameters.
+	- Can't be indexed.
+
+
+### Schema
+
+Group of tables with parent-child relationships between them. Two ways of defining them:
+
+- Table interleaving: Child rows are physically stored co-located with the parent rows:
+
+	- The relation can only be done with their primary key columns.
+	- It can be created a hierarchy of up to seven tables.
+	- Created with DDL and by including the parent table primary key as the prefix of the child table primary key.
+
+	For example, if there is a table of customers and other of payments, and payments are frequently queried by customer, payments can be defined as an interleaved child table of customers. So, one or more rows of payments will be with one row of customers.
+
+	<img src="https://cloud.google.com/static/spanner/docs/images/singers_albums_interleaved_physical.svg" style="zoom:60%;" />
+
+- Foreign keys in a child table referring the primary key of a parent table. Spanner ensures the integrity of the relationships are maintained, so transactions no fulfilling them fail.
+
+### Best practices
+
+- Keep CPU usage under 65% regional instances and 65% for multi-regions's.
+- Design a schema to avoid hotspots
+- The region with the highest write load is where the leader shards should be.
+
+### Arquitecture
+
+Instances are a collection of databases and compute resources (Storage and compute are de-coupled).
+
+The storage is divided into shards or splits, being each one a range of rows after being ordered by the primary key.
+
+For each group of identical splits distributed into the different instances, one of those is the leader and the rest the followers. The write operations are first done in the leader shard, so its optimal to put the leader where the most write operations come from.
+
+When a write request is generated:
+
+- The request always goes first to the leader.
+- The leader shares the request with other replicas forming a write quorum. The quorum votes if the write should be committed.
+- If the result is yes, the write is done and replicated through the replicas.
+
+For a read-only request, it is done on the closest replica. If the request is heavy, the replica must first communicate it to the leader.
+
+In the case of a regional configuration:
+
+- 3 read-write replicas in different zones within the region.
+- Additional read-only replicas in other zones can be added.
+- Between the same shards of all the replicas, one of the them is the leader and then the rest are the followers.
+- The operations are carried on the leader first and then propagated to the followers.
+- If a operation affects different shards whose leaders are in different zones, one of the zones is assigned as the zone coordinator.
+- In case of a leader failure, a follower becomes the new leader.
+
+In the case of a multi-region configuration:
+
+- Two read-write regions with two read-write replicas each. One of the two regions is the default leader region (For each data split or shard). Also, a witness region with an additional replica, mainly used for voting in writes.
+- Additional read-only replicas in other regions can be added.
+- Write operations are first performed in the leader region and then propagated.
+- In case of of failing, a the other shard in the same region is the new leader and if both legion leader shards fail, a shard in the other read-write region is the new leader. Usually when the original leader goes back to its initial state, it is the leader again.
+
+Use of TrueTime, a protocol to use a unified timestamp for every operation through any region using atomic clocks.
 
 ## <img src="https://interpolados.files.wordpress.com/2018/10/google-cloud-sql.png?w=640" style="zoom:12%;" /> Cloud SQL
 
@@ -1225,7 +1338,7 @@ Benefits:
 
 ## Compute Engine
 
-
+Creation of snapshots to directly recreate the instance. No need to export the snapshots.
 
 ### Quotas
 
@@ -1249,6 +1362,12 @@ Quotas restrict how much resources can be used in Compute Engine.
 	- Other quotas for GPUs, HDDs or SSDs.
 
 - 
+
+## Other services
+
+### Datastream
+
+Reads and delivers changes (Insert, update and delete) from a database origin (MySQL, PostgreSQL, AlloyDB or Oracle) to an output GCP database (BigQuery, Cloud SQL, Cloud Storage and Cloud Spanner)
 
 ## Cloud Composer
 
