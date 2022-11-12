@@ -113,6 +113,8 @@ For data governance, it is offered solutions like Cloud Data Catalog (To show th
 
 A fully managed service needs no setup or maintaining the instance. The next step is a serverless service (Which can be treated simply as an API you are using), which no server has to be managed and only is needed to pay for the use.
 
+There are different types of offering, with a different level of management effort: IaaS > CaaS > PaaS > FaaS > SaaS.
+
 ### Data pipelines in production
 
 For that, tools for workflow orchestration like Apache Airflow are used. Based on that tool, a fully managed version is available in Google Cloud, called Cloud Composer. It orchestrates all Google Cloud products using their API endpoints.
@@ -182,35 +184,14 @@ Several options in Google Cloud:
 
 	curl (With an API key) can be use to send a request.
 
-Services:
+#### Avoid overfitting
 
-- Dialogflow: Natural language understanding platform to design and integrate conversational user interfaces.
-- Vision API.
-
-#### AI Hub
-
-Repository of ML components. To find something already done and optimized instead of doing it. It can be found:
-
-- Kubeflow (ML on Kubernetes) pipelines of components.
-- Jupyter notebooks.
-- TensorFlow modules.
-- Trained models.
-- VM images.
-- Services.
-
-Both public and restricted assets (e.g. Restricted to an organization or team).
-
-### Billing
-
-It can be added labels (Key-value pairs) to objects of many services. With this, it can be filter the costs on specified categories.
-
-### Labels
-
-Cloud Storage buckets
-
-BigQuery datasets, tables, views
-
-Dataproc jobs or clusters
+- Train with more data
+- Data augmentation (Techniques to slightly modify existent data, like could be rotating or add a filter)
+- Feature selection (Choosing the most relevant features for a model)
+- Use dropout methods (Where randomly selected neurons are randomly ignored during training)
+- Cross-validation (Divide training data in k parts and train the model k times, where each a different part is the test data and the rest is the training data).
+- Regularization with the method L1 or Lasso and L2 or Ridge  to reduce the number of features if we don't know which ones.
 
 ## <img src="https://help.sap.com/doc/8b8d6fffe113457094a17701f63e3d6a/GIGYA/en-US/loio41289de270b21014bbc5a10ce4041860_LowRes.png" style="zoom:3%;"/> Google Cloud Storage
 
@@ -222,7 +203,7 @@ Object store, so it stores binary objects regardless its content. However, has s
 
 Blob storage.
 
-### Characteristics
+### Features
 
 - Available more than 99,99% of the time
 - Data is persistent, instantly available, encrypted.
@@ -232,10 +213,22 @@ Blob storage.
 - It can be specified for users to pay for accessing objects. There are network egress charges when accessing data from a different region, so it can be used to make the user pay for the access.
 - Objects can be shared using signed URLs.
 - Objects can be uploaded in pieces and then automatically create a composite object.
+- Access Control Lists (ACL) to give a fine-grained access to individual objects inside a bucket.
+- Able to host a static website of an owned domain.
 
 ### Internal arquitecture
 
-Objects are stored inside buckets. Buckets are identified by a global unique namespace. Cant use a name used elsewhere in the world until that bucket deleted.
+Objects are stored inside buckets. Buckets are identified by a global unique namespace. 
+
+Some considerations to create a bucket name:
+
+- Can't be used a name used elsewhere in the world until that bucket is deleted.
+- Can only contain lowercase letters, numbers, dashes, underscores and dots.
+
+- Must start and end with a letter or number.
+- It can not represent an IP address.
+- Can't start with "goog".
+- Can't contain a "Google" misspelling.
 
 When an object is stored, replicas are made which are monitored to replace them if lost or corrupted.
 
@@ -296,12 +289,13 @@ Encryption:
 
 Serverless data processing service for both batch and streaming data. It creates an efficient execution mechanism to run Apache Beam.
 
-### Characteristics
+### Features
 
 - Continuous auto scaling of storage and compute.
 - Same code for both batch and streaming pipelines.
 - Integration with Cloud Logging and Cloud Monitoring.
 - Automatically disabled when the job is done.
+- Ability to upgrade running jobs, without the new of stopping them, for minor changes like changing windows time.
 - Optimization of the pipeline graph created.
 - Rebalances load between workers to optimize performance.
 - Great integration with other Google Cloud services.
@@ -643,25 +637,43 @@ Also, a model trained externally can be brought to BigQuery and use it to make p
 
 ## Cloud Functions
 
+Serverless run code triggered by several events.
+
+### Features
+
+- Available a 1st and 2nd gen version, with the last having:
+	- Larger compute power
+	- Longer requests time
+	- Several requests handling in a single function (Up to 1000), reducing cold starts and latency
+	- Traffic splitting
+	- More trigger sources due to the integration with Eventarc
+- Charges for the time the functions runs, how many times is invoked and the resources the function is provisioned.
+- Code can be build in Node.js (JavaScript), Python, Go, Java, .NET (C#), Ruby and PHP.
+- A maximum number of instances can be set to avoid an excessive scaling of requests.
+- A minimum number of instances can also be set to avoid cold starts for latency-sensitive functions.
+- Event-driven functions may be invoked more than once in rare cases (Due to the asynchronous nature of the events)
+- Retries in case of failure can be set.
+
 ## <img src="https://miro.medium.com/max/512/1*ya5rb97H-xxwFK3-jd8Ujw.png" style="zoom:15%;"/> [Cloud Pub/Sub](https://cloud.google.com/pubsub/docs/overview)
 
 Asynchronous messaging service, which allows tools to send, receive or filter events or data streams from publishers to subscriptors.
 
-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+### Features
 
-Publishers or subscribers don't need to be online all the time
+- Publishers or subscribers don't need to be online all the time
 
-Stores messages for 7 days by default. Can be set to a minimum of 10 minutes and maximum of 7 days.
+- Stores messages for 7 days by default. Can be set to a minimum of 10 minutes and maximum of 7 days.
+- Messages up to 10 MB.
 
-Messages encrypted in transit and in rest
+- Messages encrypted in transit and in rest
 
-Only messages created after the subscription are available by default
+- Only messages created after the subscription are available by default
 
-Filtered messages are automatically acknowledged and don't incur egress fees
+- Filtered messages are automatically acknowledged and don't incur egress fees
 
-One topic can have many publishers
+- One topic can have many publishers
 
-Recommended to acknowledge the messages after properly processing them.
+- Recommended to acknowledge the messages after properly processing them.
 
 In pull: 1 is making the pull from subscriber to the topic, 2 is to send the messages to the subscriber and third the subscriber to acknowledge the messages.
 
@@ -1099,12 +1111,6 @@ Row-based storage
 	- If the instance was located intentionally in a zone to be close to other resources, the new primary instance can be relocated there again when the affected zone is available. If it is not the case, no need to relocate the new primary instance.
 	- The failover replica can also be used a read replica to offload read operations from the primary.
 
-### Setting up
-
-
-
-## Cloud Datastore
-
 ## Cloud Composer
 
 Serverless orchestration tool to coordinate multiple services. Based on the open source orchestration engine Apache Airflow. Use of DAGs to create the flow instructions.
@@ -1340,34 +1346,127 @@ Benefits:
 
 Creation of snapshots to directly recreate the instance. No need to export the snapshots.
 
+### Features
+
+- Able to increase persistent disks at any time even if connected to a running VM (Reducing not available).
+- Shielded VM available, with verifiable integrity of the instances against malware or rootkits.
+
+To connect to a VM, no need for SSH key if accessing within Google Cloud using the CLI or the Console.
+
+### Pricing
+
+- Per-second billing with a minimum of 1 minute.
+
 ### Quotas
 
 Quotas restrict how much resources can be used in Compute Engine.
 
 - The limits are assigned to the project based on the project zone and the user account history with Google.
-
 - Each region has independent quotas.
-
 - Prevents spikes in usage.
-
 - When a quota is exceeded, access to the resource is blocked, causing the task to fail.
-
 - Quotas are shared by all services in most cases. Different types of quotas:
 
-	- Number of IP addresses available. Limits the number of VMs that can be launched using an external IP address. If a VM does not need access to external APIs or services, an internal IP can be used, if not, an external IP is needed to have an internet access to APIs or services outside Google Cloud.
+  - Number of IP addresses available. Limits the number of VMs that can be launched using an external IP address. If a VM does not need access to external APIs or services, an internal IP can be used, if not, an external IP is needed to have an internet access to APIs or services outside Google Cloud.
 
-	- Number of CPU. Limits the total of CPU nodes within all the VMs. Using VMs with more nodes will cause the quota to trigger with less instances.
-	- Persistent storage for both HDD and SSD. Each type has an independent capacity limit.
+  - Number of CPU. Limits the total of CPU nodes within all the VMs. Using VMs with more nodes will cause the quota to trigger with less instances.
+  - Persistent storage for both HDD and SSD. Each type has an independent capacity limit.
 
-	- Other quotas for GPUs, HDDs or SSDs.
+  - Other quotas for GPUs, HDDs or SSDs.
 
-- 
 
-## Other services
+## Other data services
+
+### Firestore
+
+No-SQL document database, part of the Firebase platform. Includes a mode to use existing Datastore database and upgrade them to Firestore databases.
+
+### Dataprep
+
+Offered by a third party, gives a visual interface to do data transformations which are internally carried out by Dataflow.
 
 ### Datastream
 
 Reads and delivers changes (Insert, update and delete) from a database origin (MySQL, PostgreSQL, AlloyDB or Oracle) to an output GCP database (BigQuery, Cloud SQL, Cloud Storage and Cloud Spanner)
+
+### Database Migration Service
+
+Service to migrate (Lift and shift) MySQL, PostgreSQL, SQL Server or Oracle instances into Cloud SQL or AlloyDB for PostgreSQL.
+
+### AlloyDB
+
+PostgreSQL compatible database that takes advantage of Google Cloud scaling.
+
+### Cloud Memorystore
+
+Fully-managed solution for both Redis and Memcached in-memory databases.
+
+### Dataplex
+
+Unifies data management across different locations like data warehouses, lakes or marts.
+
+### Cloud Data Catalog
+
+Fully managed and scalable system to make metadata about data from different services and projects available to search for the users. It can be added information like tags, flag sensitive columns, etc. Each user can have a overall view of the data he has access to.
+
+### Cloud Data Loss Prevention
+
+Used to classify sensible data. Usually used with Cloud Data Catalog.
+
+### Filestore
+
+Network File system storage. Three versions: Basic, high scale and enterprise. The enterprise version offers a fully managed, 99.99% available solutions with snapshots.
+
+## Other Compute Services
+
+### Cloud Run
+
+Serverless platform to run containers invokable with requests or events. Unlike Cloud Functions, each can handle several requests and it can be used any language.
+
+### Google Kubernetes Engine
+
+Use of Kubernetes to deploy, manage and scale containers.
+
+### App Engine
+
+Serverless platform to develop and host web applications. Several languages and frameworks can be used.
+
+### Cloud Deployment Manager
+
+Service to manage infrastructure deployment, automating the creation and management of GCP resources.
+
+## Other AI Services
+
+### Cloud Vision
+
+Environment to create computer vision applications or use pre-trained APIs.
+
+### Dialogoflow
+
+AI to create lifelike oconversations.
+
+### AI Hub
+
+Repository of ML components. To find something already done and optimized instead of doing it. It can be found:
+
+- Kubeflow (ML on Kubernetes) pipelines of components.
+- Jupyter notebooks.
+- TensorFlow modules.
+- Trained models.
+- VM images.
+- Services.
+
+Both public and restricted assets (e.g. Restricted to an organization or team).
+
+## Other Network and Security Services
+
+### Cloud KMS
+
+Service to store and create keys to encrypt data at different services.
+
+### Cloud Armor
+
+Service to protect Google Cloud deployments against several threats like DDoS, cross-site scripting or SQL injection. Both automatic and user-defined configurations
 
 ## Cloud Composer
 
@@ -1436,17 +1535,7 @@ To visualize data.
 
 When adding a source to a report, other people who can view the report can potentially see all data in that data source and anyone who can edit the report can also use all the fields from any of the sources to create new charts.
 
-## <img src="https://wursta.com/wp-content/uploads/2021/03/cloud-dlp-solution-d26cda4b-39ea-3586-ba91-bcf79110892f-1554235897478.png" style="zoom:17%;" /> Cloud Data Catalog
-
-Fully managed and scalable system to make metadata about data from different services and projects available to search for the users. It can be added information like tags, flag sensitive columns, etc. Each user can have a overall view of the data he has access to.
-
-Use of the UI or API to cataloging data.
-
-Provides tags of different types, not only strings.
-
-Usually used with the Cloud Data Loss Prevention API to classify sensible data.
-
-Foundation for data governance.
+## <img src="https://wursta.com/wp-content/uploads/2021/03/cloud-dlp-solution-d26cda4b-39ea-3586-ba91-bcf79110892f-1554235897478.png" style="zoom:17%;" />
 
 ## <img src="https://www.jhanley.com/wp-content/uploads/2019/01/Cloud-IAM.png" style="zoom:17%;" /> IAM
 
@@ -1533,6 +1622,32 @@ Offline process for large amounts of data. Offline process. Google Cloud ships a
 The appliance is about the size of a suitcase, resistant and sealed and comes in two capacities, 40 TB and 300 TB. A rack format is also available.
 
 Useful for data collection, replication and migration.
+
+## Google Cloud CLI
+
+qwiklabs-gcp-02-b78d944b6aec
+
+Can be used within Cloud Shell or installing the SDK.
+
+`gcloud` to manage most of Cloud resources and developer workflow. Examples:
+
+- `gcloud h` to see list of all the functionalities available (compute, logging, auth, etc.)
+- `gcloud <functionality> --help` to see instructions about the functionality selected
+
+- `gcloud auth list` to list active account names
+- `gcloud config list` to see a list of configurations
+- `gcloud components list` to list components used
+- `gcloud config list project` to list projects ID
+- `gcloud config get-value project` to see the ID of the current project
+- `gcloud compute project-info describe --project <project_id>` to see info about a project.
+- `gcloud config set compute/[region/zone]` to set a default region or zone
+- `gcloud config get-value compute/[region/zone]` to see the default region or zone
+
+Also, there are other tools specific to a service:
+
+- `gsutil` to manage Cloud Storage buckets content.
+
+- `bq` to interact with BigQuery.
 
 ## Best practices
 
@@ -1938,3 +2053,5 @@ YARN: In a Hadoop ecosystem, a resource manager to distribute loads between part
 Reinforcement learning: Technique where a machine tries actions without previous training training to reach the highest rewards. Wrong actions are punished and correct are rewarded so it learns with trial and error. Examples are training an agent to play a maze game or a racing game.
 
 Multi tenancy: Mode of operation where multiple independent instances operate in a shared environment.
+
+Stateful applications: Those that save data to a persistent storage to be used later.
