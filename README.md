@@ -1,6 +1,6 @@
 <p>
 <ul>
-    <a style="font-size:20px;" href="https://github.com/sergijoan22/notes/blob/main/notes/python"><li><b><img src="https://raw.githubusercontent.com/sergijoan22/sergijoan22/main/pictures/python.png" alt="drawing" width="30"/> Python</b></li></a>
+    <a style="font-size:20px;" href="https://github.com/sergijoan22/notes/blob/main/notes/Python"><li><b><img src="https://raw.githubusercontent.com/sergijoan22/sergijoan22/main/pictures/python.png" alt="drawing" width="15"/> Python</b></li></a>
         <ul>
         <a style="font-size:18px;" href="https://github.com/sergijoan22/notes/blob/main/notes/python_data_structures.md"><li><b>Data Structures</b></li></a>
             <a style="font-size:18px;" href="https://github.com/sergijoan22/notes/blob/main/notes/python_oop.md"><li><b>Object Oriented Programing</b></li></a> 
